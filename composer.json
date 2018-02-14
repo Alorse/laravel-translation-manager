@@ -1,0 +1,60 @@
+{
+    "name": "Alorse/laravel-translation-manager",
+    "description": "Enhanced Laravel Translation Manager",
+    "keywords": [
+        "laravel",
+        "translations",
+        "translator"
+    ],
+    "homepage": "https://github.com/Alorse/laravel-translation-manager",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Vladimir Schneider",
+            "email": "vladimir.schneider@gmail.com",
+            "role": "Developer"
+        },
+        {
+            "name": "Alfredo Ortegón Sepúlveda",
+            "email": "alorse@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=5.6.4",
+        "illuminate/support": "^5.5",
+        "laravelcollective/html": "^5.5",
+        "illuminate/translation": "^5.5",
+        "doctrine/dbal": "~2.3",
+        "symfony/finder": "~3.0"
+    },
+    "require-dev": {
+        "phpspec/phpspec": "~3.0",
+        "fzaninotto/faker": "~1.4",
+        "mockery/mockery": "0.9.*",
+        "phpunit/phpunit": "~6.0"
+    },
+    "autoload": {
+        "classmap": [
+            "src/Classes"
+        ],
+        "files": [
+            "src/Support/helpers.php"
+        ],
+        "psr-4": {
+            "Alorse\\TranslationManager\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "classmap": [
+            "tests/"
+        ],
+        "psr-4": {
+        }
+    },
+    "scripts": {
+        "post-update-cmd": [
+        ]
+    },
+    "minimum-stability": "stable"
+}
