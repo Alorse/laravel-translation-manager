@@ -2,21 +2,24 @@
 
 namespace Alorse\TranslationManager;
 
-use Carbon\Carbon;
 use Exception;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Query\Expression;
+use ZipArchive;
+use Carbon\Carbon;
 use Illuminate\Events\Dispatcher;
-use Illuminate\Filesystem\Filesystem;
-use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Gate;
 use Symfony\Component\Finder\Finder;
-use Alorse\TranslationManager\Classes\PathTemplateResolver;
-use Alorse\TranslationManager\Classes\TranslationFileRewriter;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Foundation\Application;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Expression;
+use Illuminate\Database\Eloquent\Collection;
 use Alorse\TranslationManager\Models\Translation;
 use Alorse\TranslationManager\Models\UserLocales;
+use Alorse\TranslationManager\Classes\PathTemplateResolver;
+use Alorse\TranslationManager\Classes\TranslationFileRewriter;
 use Alorse\TranslationManager\Repositories\Interfaces\ITranslatorRepository;
-use ZipArchive;
 
 /**
  * Class Manager
@@ -138,14 +141,16 @@ class Manager
         }
 
         $userListConnection = $this->getConnectionInfo($connectionName, self::USER_LIST_CONNECTION_KEY, $connectionName);
-        if (!$userListConnection) $userListConnection = $connectionName;
+        if (!$userListConnection) {
+            $userListConnection = $connectionName;
+        }
         return $userListConnection;
     }
 
     public function getUserListProvider($connection)
     {
         return function ($user, $connection_name, &$user_list) {
-            return \Gate::forUser($user)->allows(self::ABILITY_LIST_EDITORS, [$connection_name, &$user_list]);
+            return Gate::forUser($user)->allows(self::ABILITY_LIST_EDITORS, [$connection_name, &$user_list]);
         };
     }
 
@@ -163,7 +168,7 @@ class Manager
         }
 
         $db_connections = $this->config(self::DB_CONNECTIONS_KEY);
-        $environment = \App::environment();
+        $environment = App::environment();
 
         $db_connection = $connectionName !== null && array_key_exists($environment, $db_connections) && array_key_exists($connectionName, $db_connections[$environment]) ? $db_connections[$environment][$connectionName] : null;
 
@@ -190,7 +195,7 @@ class Manager
         return $this->config(self::USER_LOCALES_ENABLED, false);
     }
 
-    function firstOrNewTranslation($attributes = null)
+    public function firstOrNewTranslation($attributes = null)
     {
         $checkDB = true;
 
@@ -230,7 +235,7 @@ class Manager
         return $translation;
     }
 
-    function firstOrCreateTranslation($attributes = null)
+    public function firstOrCreateTranslation($attributes = null)
     {
         $translation = $this->firstOrNewTranslation($attributes);
         if (!$translation->exists) {
@@ -329,7 +334,9 @@ class Manager
     public function config($key = null, $default = null)
     {
         // Version 5.1
-        if (!$this->config) $this->config = $this->app['config'][$this->package];
+        if (!$this->config) {
+            $this->config = $this->app['config'][$this->package];
+        }
         // Version 4.2
         //if (!$this->config) $this->config = $this->app['config'][$this->package.'::config'];
 
@@ -373,8 +380,8 @@ class Manager
     public function cache()
     {
         if ($this->cache === null) {
-            $this->cache = $this->cachePrefix() !== '' && $this->indatabase_publish != 0 && \Cache::has($this->cacheTransKey) ? \Cache::get($this->cacheTransKey) : [];
-            $this->cacheIsDirty = $this->persistentPrefix !== '' && !\Cache::has($this->cacheTransKey);
+            $this->cache = $this->cachePrefix() !== '' && $this->indatabase_publish != 0 && Cache::has($this->cacheTransKey) ? Cache::get($this->cacheTransKey) : [];
+            $this->cacheIsDirty = $this->persistentPrefix !== '' && !Cache::has($this->cacheTransKey);
         }
         return $this->cache;
     }
@@ -382,8 +389,8 @@ class Manager
     public function usageCache()
     {
         if ($this->usageCache === null) {
-            $this->usageCache = $this->usageCachePrefix() !== '' && \Cache::has($this->usageCacheTransKey) ? \Cache::get($this->usageCacheTransKey) : [];
-            $this->usageCacheIsDirty = $this->persistentPrefix !== '' && !\Cache::has($this->usageCacheTransKey);
+            $this->usageCache = $this->usageCachePrefix() !== '' && Cache::has($this->usageCacheTransKey) ? Cache::get($this->usageCacheTransKey) : [];
+            $this->usageCacheIsDirty = $this->persistentPrefix !== '' && !Cache::has($this->usageCacheTransKey);
         }
         return $this->usageCache;
     }
@@ -391,7 +398,7 @@ class Manager
     public function saveCache()
     {
         if ($this->persistentPrefix && $this->cacheIsDirty) {
-            \Cache::put($this->cacheTransKey, $this->cache, 60 * 24 * 365);
+            Cache::put($this->cacheTransKey, $this->cache, 60 * 24 * 365);
             $this->cacheIsDirty = false;
         }
     }
@@ -401,8 +408,8 @@ class Manager
         if ($this->persistentPrefix && $this->usageCacheIsDirty) {
             // we never save it in the cache, it is only in database use, otherwise every page it will save the full cache to the database
             // instead of only the accessed keys
-            //\Cache::put($this->usageCacheTransKey, $this->usageCache, 60 * 24 * 365);
-            \Cache::put($this->usageCacheTransKey, [], 60 * 24 * 365);
+            //Cache::put($this->usageCacheTransKey, $this->usageCache, 60 * 24 * 365);
+            Cache::put($this->usageCacheTransKey, [], 60 * 24 * 365);
             $this->usageCacheIsDirty = false;
 
             // now update the keys in the database
@@ -418,7 +425,9 @@ class Manager
             $this->cache = [];
             $this->cacheIsDirty = !!$this->persistentPrefix;
         } elseif ($this->cache()) {
-            if (!is_array($groups)) $groups = [$groups];
+            if (!is_array($groups)) {
+                $groups = [$groups];
+            }
 
             foreach ($groups as $group) {
                 if (array_key_exists($group, $this->cache)) {
@@ -502,7 +511,7 @@ class Manager
     {
         $group = self::fixGroup($group);
         $group = $namespace && $namespace !== '*' ? $namespace . '::' . $group : $group;
-        
+
         $cacheKey = $this->cacheKey($transKey, $locale);
         $value = $group && array_key_exists($group, $this->cache()) && array_key_exists($cacheKey, $this->cache[$group]) ? $this->cache[$group][$cacheKey] : null;
         return $value;
@@ -526,7 +535,7 @@ class Manager
     {
         $group = self::fixGroup($group);
         $group = $namespace && $namespace !== '*' ? $namespace . '::' . $group : $group;
-        
+
         $cacheKey = $this->usageCacheKey($transKey, $locale);
         $value = $group && array_key_exists($group, $this->usageCache()) && array_key_exists($cacheKey, $this->usageCache[$group]) ? $this->usageCache[$group][$cacheKey] : null;
         return $value;
@@ -566,10 +575,10 @@ class Manager
             if (!in_array($group, $this->config(self::EXCLUDE_GROUPS_KEY))) {
                 $lottery = 1;
                 if ($useLottery && $this->config(self::MISSING_KEYS_LOTTERY_KEY) !== 1) {
-                    $lottery = \Session::get($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, '');
+                    $lottery = Session::get($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, '');
                     if ($lottery === '') {
                         $lottery = rand(1, $this->config(self::MISSING_KEYS_LOTTERY_KEY));
-                        \Session::put($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, $lottery);
+                        Session::put($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, $lottery);
                     }
                 }
 
@@ -584,17 +593,17 @@ class Manager
                     $locale = $locale ?: $this->app['config']['app.locale'];
 
                     if ($findOrNew) {
-                        $translation = $this->firstOrNewTranslation(array(
+                        $translation = $this->firstOrNewTranslation([
                             'locale' => $locale,
-                            'group'  => $group,
-                            'key'    => $key,
-                        ));
+                            'group' => $group,
+                            'key' => $key,
+                        ]);
                     } else {
-                        $translation = $this->firstOrCreateTranslation(array(
+                        $translation = $this->firstOrCreateTranslation([
                             'locale' => $locale,
-                            'group'  => $group,
-                            'key'    => $key,
-                        ));
+                            'group' => $group,
+                            'key' => $key,
+                        ]);
                     }
 
                     /* @var $translation \Alorse\TranslationManager\Models\Translation */
@@ -621,16 +630,16 @@ class Manager
             if (!in_array($group, $this->config(self::EXCLUDE_GROUPS_KEY))) {
                 $lottery = 1;
                 if ($useLottery && $this->config(self::MISSING_KEYS_LOTTERY_KEY) !== 1) {
-                    $lottery = \Session::get($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, '');
+                    $lottery = Session::get($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, '');
                     if ($lottery === '') {
                         $lottery = rand(1, $this->config(self::MISSING_KEYS_LOTTERY_KEY));
-                        \Session::put($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, $lottery);
+                        Session::put($this->config(self::PERSISTENT_PREFIX_KEY) . self::LOTTERY_PERSISTENT_SUFFIX, $lottery);
                     }
                 }
 
                 if ($lottery == 1) {
                     $locale = $locale ?: $this->app['config']['app.locale'];
-                    $this->cacheUsageInfo('', $group,  $key, 1, $locale);
+                    $this->cacheUsageInfo('', $group, $key, 1, $locale);
                 }
             }
         }
@@ -657,7 +666,9 @@ class Manager
         $statusChangeOnly = [];
         foreach ($translations as $key => $value) {
             if (is_array($value)) {
-                if ($value) $this->errors[] = "translation value is an array: $db_group.$key locale $locale";
+                if ($value) {
+                    $this->errors[] = "translation value is an array: $db_group.$key locale $locale";
+                }
                 continue;
             }
             $value = (string)$value;
@@ -666,11 +677,11 @@ class Manager
                 $translation = $dbTransMap[$key];
                 unset($dbTransMap[$key]);
             } else {
-                $translation = new Translation(array(
+                $translation = new Translation([
                     'locale' => $locale,
-                    'group'  => $db_group,
-                    'key'    => $key,
-                ));
+                    'group' => $db_group,
+                    'key' => $key,
+                ]);
 
                 $translation->setConnection($connectionName);
                 $tmp = 0;
@@ -776,7 +787,9 @@ class Manager
         if ($groups !== null) {
             // now we can filter to the list of given groups or
             $files = [];
-            if (!is_array($groups)) $groups = array($groups);
+            if (!is_array($groups)) {
+                $groups = [$groups];
+            }
             $groups = array_combine($groups, $groups);
 
             foreach ($langFiles as $file => $values) {
@@ -792,7 +805,9 @@ class Manager
             $locale = $vars['{locale}'];
             $db_group = $vars['{db_group}'];
 
-            if (in_array($db_group, $this->config(self::EXCLUDE_GROUPS_KEY))) continue;
+            if (in_array($db_group, $this->config(self::EXCLUDE_GROUPS_KEY))) {
+                continue;
+            }
             $translations = array_dot(include($langFile));
             $this->importTranslationFile($locale, $db_group, $translations, $replace);
         }
@@ -802,7 +817,7 @@ class Manager
 
     public function findTranslations($path = null)
     {
-        $functions = array(
+        $functions = [
             'trans',
             'trans_choice',
             'noEditTrans',
@@ -814,7 +829,7 @@ class Manager
             '@lang',
             '@choice',
             '__',
-        );
+        ];
         $pattern =                                  // See http://regexr.com/392hu
             "(" . implode('|', $functions) . ")" .  // Must start with one of the functions
             "\\(" .                                 // Match opening parentheses
@@ -828,7 +843,7 @@ class Manager
 
         // Find all PHP + Twig files in the app folder, except for storage
         $paths = $path ? [$path] : array_merge([$this->app->basePath() . '/app'], $this->app['config']['view']['paths']);
-        $keys = array();
+        $keys = [];
         foreach ($paths as $path) {
             $finder = new Finder();
             $finder->in($path)->name('*.php')->name('*.twig')->files();
@@ -928,7 +943,9 @@ class Manager
         // Build path and create directories if needed
         for ($k = 0; $k < count($directories); $k++) {
             $dirpath .= $directories[$k] . "/";
-            if ($k < $i) continue;
+            if ($k < $i) {
+                continue;
+            }
             if (!$this->files->exists($dirpath)) {
                 try {
                     $this->files->makeDirectory($dirpath);
@@ -996,7 +1013,9 @@ class Manager
 
         if (!$inDatabasePublishing || $inDatabasePublishing == 2 || $inDatabasePublishing == 3) {
             if (!in_array($group, $this->config(self::EXCLUDE_GROUPS_KEY))) {
-                if ($group == '*') $this->exportAllTranslations(1);
+                if ($group == '*') {
+                    $this->exportAllTranslations(1);
+                }
 
                 if ($inDatabasePublishing != 3) {
                     $this->clearCache($group);
@@ -1008,11 +1027,11 @@ class Manager
                 $lostDotTranslations = $this->getLostDotTranslation($rawTranslations, $tree);
                 if ($lostDotTranslations) {
                     $errorText = "Incorrect use of dot convention for translation keys (value will be overwritten with an array of child values):";
-                    
+
                     foreach ($lostDotTranslations as $group => $groupKeys) {
                         $keys = $groupKeys;
                         $errorText .= "<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>$group::</strong>";
-                        
+
                         foreach ($keys as $key => $value) {
                             $errorText .= "<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$key";
                         }
@@ -1062,11 +1081,11 @@ class Manager
                 }
 
                 if (!$inDatabasePublishing) {
-                    $this->translation->where('group', $group)->update(array(
-                        'status'        => Translation::STATUS_SAVED,
+                    $this->translation->where('group', $group)->update([
+                        'status' => Translation::STATUS_SAVED,
                         'is_auto_added' => 0,
-                        'saved_value'   => (new Expression('value')),
-                    ));
+                        'saved_value' => (new Expression('value')),
+                    ]);
                 }
             }
         }
@@ -1129,7 +1148,7 @@ class Manager
 
     protected function makeTree($translations)
     {
-        $array = array();
+        $array = [];
         foreach ($translations as $translation) {
             array_set($array[$translation->locale][$translation->group], $translation->key, $translation->value);
         }
@@ -1138,8 +1157,8 @@ class Manager
 
     protected function getLostDotTranslation($translations, $tree)
     {
-        // check if all translation values are in the array or some were lost because of invalid dot notation for keys 
-        $nonArrays = array();
+        // check if all translation values are in the array or some were lost because of invalid dot notation for keys
+        $nonArrays = [];
         foreach ($translations as $translation) {
             $group = $translation->group;
             $key = $translation->key;
@@ -1147,7 +1166,7 @@ class Manager
                 $value = array_get($tree[$translation->locale][$translation->group], $translation->key);
 
                 if (is_array($value)) {
-                    // this one is an array while it is a translation in the source 
+                    // this one is an array while it is a translation in the source
                     $nonArrays[$group][$key] = $translation;
                 }
             }
@@ -1155,5 +1174,4 @@ class Manager
 
         return $nonArrays;
     }
-
 }
